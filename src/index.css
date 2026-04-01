@@ -156,6 +156,30 @@ select option {
   animation: authCardIn 0.4s ease;
 }
 
+.not-found-layout {
+  grid-template-columns: minmax(320px, 560px);
+  justify-content: center;
+}
+
+.not-found-card {
+  text-align: left;
+  gap: 0.8rem;
+}
+
+.not-found-card h1 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.not-found-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .auth-card h1 {
   margin: 0;
 }
@@ -1123,6 +1147,39 @@ select option {
   font-size: 0.93rem;
 }
 
+.queue-status-card {
+  border: 1px solid #d8dff1;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfcff, #f5f7fd);
+  padding: 0.58rem 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.queue-status-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.queue-status-copy p {
+  margin: 0;
+  color: #3b4662;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.compact-btn {
+  min-height: 34px;
+  padding: 0.38rem 0.72rem;
+  border-radius: 9px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  box-shadow: 0 8px 18px rgba(124, 110, 230, 0.2);
+}
+
 .upload-spinner {
   width: 28px;
   height: 28px;
@@ -1665,6 +1722,15 @@ video {
   .file-picker {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .queue-status-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .compact-btn {
+    width: 100%;
   }
 }
 

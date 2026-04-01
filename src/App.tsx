@@ -8,6 +8,7 @@ import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { AdminUserDetailPage } from "./pages/AdminUserDetailPage";
 import { DashboardHomePage } from "./pages/DashboardHomePage";
 import { LoginPage } from "./pages/LoginPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { UploadPage } from "./pages/UploadPage";
 import { VideosPage } from "./pages/VideosPage";
@@ -52,7 +53,7 @@ function App() {
         />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

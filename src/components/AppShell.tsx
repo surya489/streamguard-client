@@ -16,6 +16,7 @@ export function AppShell() {
     setIsSidebarOpen(false);
     setIsUserMenuOpen(false);
   };
+  const canUpload = user?.role === "ADMIN" || user?.role === "EDITOR";
   const displayName = user?.name && user.name.trim().length > 0 ? user.name.trim() : user?.email?.split("@")[0] ?? "User";
   const initials = getUserInitials(user?.name ?? "", user?.email ?? "");
 
@@ -55,10 +56,12 @@ export function AppShell() {
             <LayoutDashboard size={16} />
             Overview
           </NavLink>
-          <NavLink to="/dashboard/upload" onClick={closeSidebar}>
-            <Upload size={16} />
-            Upload
-          </NavLink>
+          {canUpload ? (
+            <NavLink to="/dashboard/upload" onClick={closeSidebar}>
+              <Upload size={16} />
+              Upload
+            </NavLink>
+          ) : null}
           <NavLink to="/dashboard/videos" onClick={closeSidebar}>
             <Video size={16} />
             Videos
