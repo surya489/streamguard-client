@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Filter, RefreshCcw, Settings2, UserRound } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { getUsers, getVideos, updateUserRole } from "../services/api";
 import { connectVideoSocket } from "../services/socket";
 import type { AdminUserCreatedEvent, AdminVideoUploadedEvent, Role, UserListItem, VideoItem } from "../types";
+import { getErrorMessage } from "../utils/error";
 
 type SortOption = "name_asc" | "name_desc" | "created_desc" | "created_asc" | "videos_desc" | "videos_asc";
 
@@ -42,17 +44,20 @@ function roleOptions(currentRole: Role): Role[] {
   return ["ADMIN", "EDITOR"];
 }
 
+function formatRoleLabel(role: Role) {
+  return `${role.charAt(0)}${role.slice(1).toLowerCase()}`;
+}
+
 export function AdminUsersPage() {
   const { token, user } = useAuth();
+  const { showToast } = useToast();
   const isAdmin = user?.role === "ADMIN";
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [videoCountByUserId, setVideoCountByUserId] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [updatingUserId, setUpdatingUserId] = useState("");
-  const [message, setMessage] = useState("");
 
   const [roleFilter, setRoleFilter] = useState((searchParams.get("role") as Role | "") ?? "");
   const [sort, setSort] = useState((searchParams.get("sort") as SortOption) ?? "created_desc");
@@ -63,15 +68,12 @@ export function AdminUsersPage() {
   const [roleDraft, setRoleDraft] = useState<RoleChangeDraft | null>(null);
   const [activeFilterMenu, setActiveFilterMenu] = useState<FilterMenuKey>("");
 
-  const containerRef = useRef<HTMLElement | null>(null);
-
   const loadData = useCallback(async () => {
     if (!token || !isAdmin) {
       setLoading(false);
       return;
     }
 
-    setError("");
     setLoading(true);
     try {
       const [usersResponse, videosResponse] = await Promise.all([
@@ -89,11 +91,12 @@ export function AdminUsersPage() {
       setUsers(usersResponse.users);
       setVideoCountByUserId(counts);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not fetch user data");
+      const message = getErrorMessage(err, "Could not fetch user data.");
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, token]);
+  }, [isAdmin, showToast, token]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -141,9 +144,14 @@ export function AdminUsersPage() {
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
-      if (!containerRef.current) return;
-      if (!containerRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+
+      if (!target.closest(".role-menu-wrap")) {
         setActiveRoleMenuUserId("");
+      }
+
+      if (!target.closest(".dropdown-wrap")) {
         setActiveFilterMenu("");
       }
     }
@@ -182,13 +190,12 @@ export function AdminUsersPage() {
     if (!token || !roleDraft) return;
 
     if (roleDraft.user.role === "ADMIN" && roleDraft.nextRole !== "ADMIN" && adminCount <= 1) {
-      setError("Cannot remove role from the last ADMIN user.");
+      const message = "Cannot remove role from the last ADMIN user.";
+      showToast(message, "error");
       setRoleDraft(null);
       return;
     }
 
-    setError("");
-    setMessage("");
     setUpdatingUserId(roleDraft.user._id);
 
     try {
@@ -196,9 +203,10 @@ export function AdminUsersPage() {
       setUsers((current) =>
         current.map((item) => (item._id === roleDraft.user._id ? { ...item, role: roleDraft.nextRole } : item))
       );
-      setMessage(`Role updated for ${roleDraft.user.name}.`);
+      showToast(`Role updated for ${roleDraft.user.name}.`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Role update failed");
+      const message = getErrorMessage(err, "Role update failed.");
+      showToast(message, "error");
     } finally {
       setUpdatingUserId("");
       setRoleDraft(null);
@@ -228,21 +236,21 @@ export function AdminUsersPage() {
       <section>
         <div className="page-head">
           <h2>Users</h2>
-          <p>Only ADMIN role can access this page.</p>
+          <p>This section is available only for admin accounts.</p>
         </div>
       </section>
     );
   }
 
   return (
-    <section ref={containerRef}>
+    <section>
       <div className="page-head admin-head">
         <h2>
           <UserRound className="title-lucide" size={18} /> Users
         </h2>
         <span className="admin-badge">Admin Only</span>
       </div>
-      <p className="muted">Manage user roles and monitor uploaded video counts in realtime.</p>
+      <p className="muted">Manage user roles and review upload activity in real time.</p>
 
       <div className="panel filter-panel">
         <h3>User Controls</h3>
@@ -254,7 +262,7 @@ export function AdminUsersPage() {
               onClick={() => setActiveFilterMenu((current) => (current === "role" ? "" : "role"))}
             >
               <Filter size={14} />
-              {roleFilter ? roleFilter : "All roles"}
+              {roleFilter ? formatRoleLabel(roleFilter) : "All roles"}
               <span className="select-caret" />
             </button>
             {activeFilterMenu === "role" ? (
@@ -381,72 +389,86 @@ export function AdminUsersPage() {
         </div>
       </div>
 
-      {loading ? <p className="alert alert-info">Loading users...</p> : null}
-      {error ? <p className="alert alert-error">{error}</p> : null}
-      {message ? <p className="alert alert-success">{message}</p> : null}
-
       <div className="panel table-panel">
-        <div className="table-wrap">
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Videos</th>
-                <th>Created</th>
-                <th>Profile</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((item) => (
-                <tr key={item._id}>
-                  <td>{item.name}</td>
-                  <td>{item.email}</td>
-                  <td>
-                    <div className="role-cell role-menu-wrap">
-                      <button
-                        type="button"
-                        className={`chip role-${item.role.toLowerCase()} role-chip-button`}
-                        onClick={() =>
-                          setActiveRoleMenuUserId((current) => (current === item._id ? "" : item._id))
-                        }
-                        disabled={updatingUserId === item._id || item._id === user?.id}
-                      >
-                        {item._id === user?.id ? "You" : item.role}
-                      </button>
-
-                      {activeRoleMenuUserId === item._id ? (
-                        <div className="role-menu">
-                          {roleOptions(item.role).map((roleOption) => (
-                            <button
-                              key={roleOption}
-                              type="button"
-                              className="role-option"
-                              onClick={() => {
-                                setActiveRoleMenuUserId("");
-                                setRoleDraft({ user: item, nextRole: roleOption });
-                              }}
-                            >
-                              Set as {roleOption}
-                            </button>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  </td>
-                  <td>{videoCountByUserId[item._id] ?? 0}</td>
-                  <td>{formatDate(item.createdAt)}</td>
-                  <td>
-                    <Link to={`/dashboard/users/${item._id}`} className="table-link" title="View user profile">
-                      View
-                    </Link>
-                  </td>
+        {loading ? (
+          <div className="table-skeleton-wrap">
+            <div className="table-skeleton-head">
+              <span className="skeleton skeleton-line" />
+            </div>
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div className="table-skeleton-row" key={index}>
+                <span className="skeleton skeleton-line" />
+                <span className="skeleton skeleton-line" />
+                <span className="skeleton skeleton-chip" />
+                <span className="skeleton skeleton-line small" />
+                <span className="skeleton skeleton-line" />
+                <span className="skeleton skeleton-chip" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="table-wrap">
+            <table className="users-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Videos</th>
+                  <th>Created</th>
+                  <th>Profile</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {paginated.map((item) => (
+                  <tr key={item._id}>
+                    <td>{item.name}</td>
+                    <td>{item.email}</td>
+                    <td>
+                      <div className="role-cell role-menu-wrap">
+                        <button
+                          type="button"
+                          className={`chip role-${item.role.toLowerCase()} role-chip-button`}
+                          onClick={() =>
+                            setActiveRoleMenuUserId((current) => (current === item._id ? "" : item._id))
+                          }
+                          disabled={updatingUserId === item._id || item._id === user?.id}
+                        >
+                          {item._id === user?.id ? "You" : formatRoleLabel(item.role)}
+                        </button>
+
+                        {activeRoleMenuUserId === item._id ? (
+                          <div className="role-menu">
+                            {roleOptions(item.role).map((roleOption) => (
+                              <button
+                                key={roleOption}
+                                type="button"
+                                className="role-option"
+                                onClick={() => {
+                                  setActiveRoleMenuUserId("");
+                                  setRoleDraft({ user: item, nextRole: roleOption });
+                                }}
+                              >
+                                Set as {formatRoleLabel(roleOption)}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td>{videoCountByUserId[item._id] ?? 0}</td>
+                    <td>{formatDate(item.createdAt)}</td>
+                    <td>
+                      <Link to={`/dashboard/users/${item._id}`} className="table-link" title="View user profile">
+                        View
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {!loading && paginated.length === 0 ? <p className="alert alert-info">No users found for selected filters.</p> : null}
 

@@ -11,6 +11,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { UploadPage } from "./pages/UploadPage";
 import { VideosPage } from "./pages/VideosPage";
+import { ProfilePage } from "./pages/ProfilePage";
 
 function App() {
   const { token } = useAuth();
@@ -30,6 +31,7 @@ function App() {
         }
       >
         <Route index element={<DashboardHomePage />} />
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="upload" element={<UploadPage />} />
         <Route path="videos" element={<VideosPage />} />
         <Route

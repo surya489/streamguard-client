@@ -4,6 +4,7 @@ export type UserInfo = {
   id: string;
   email: string;
   role: Role;
+  name?: string;
 };
 
 export type UserListItem = {
@@ -76,4 +77,5 @@ export type AuthContextType = {
   login: (payload: LoginPayload) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<void>;
   logout: () => void;
+  updateUser: (patch: Partial<UserInfo>) => void;
 };

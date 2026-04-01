@@ -3,9 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ListFilter, SlidersHorizontal, UserRound } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { getStreamUrl, getUsers, getVideos } from "../services/api";
 import { connectVideoSocket } from "../services/socket";
 import type { AdminVideoUploadedEvent, UserListItem, VideoItem, VideoProgressEvent } from "../types";
+import { getErrorMessage } from "../utils/error";
 
 const PER_PAGE_OPTIONS = [8, 12, 16];
 
@@ -30,14 +32,19 @@ function getOwnerId(video: VideoItem): string {
   return video.user._id;
 }
 
+function formatRoleLabel(role: string) {
+  if (!role) return "";
+  return `${role.charAt(0)}${role.slice(1).toLowerCase()}`;
+}
+
 export function AdminUserDetailPage() {
   const { token } = useAuth();
+  const { showToast } = useToast();
   const { userId = "" } = useParams();
 
   const [targetUser, setTargetUser] = useState<UserListItem | null>(null);
   const [allUserVideos, setAllUserVideos] = useState<VideoItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(8);
   const [sort, setSort] = useState<SortOption>("newest");
@@ -50,8 +57,6 @@ export function AdminUserDetailPage() {
       }
 
       setLoading(true);
-      setError("");
-
       try {
         const [usersResponse, videosResponse] = await Promise.all([
           getUsers(token),
@@ -64,14 +69,15 @@ export function AdminUserDetailPage() {
         const videos = videosResponse.videos.filter((video) => getOwnerId(video) === userId);
         setAllUserVideos(videos);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not fetch user details");
+        const message = getErrorMessage(err, "Could not fetch user details.");
+        showToast(message, "error");
       } finally {
         setLoading(false);
       }
     }
 
     void loadData();
-  }, [token, userId]);
+  }, [showToast, token, userId]);
 
   useEffect(() => {
     if (!token || !userId) return;
@@ -134,17 +140,25 @@ export function AdminUserDetailPage() {
         <span className="admin-badge">Admin Only</span>
       </div>
 
-      <p className="muted">
+      <div className="single-user-actions">
         <Link to="/dashboard/users" className="table-link">
-          <ArrowLeft size={14} /> Back to Users
+          <ArrowLeft size={14} /> Back to User List
         </Link>
-      </p>
+      </div>
 
-      {loading ? <p className="alert alert-info">Loading user profile...</p> : null}
-      {error ? <p className="alert alert-error">{error}</p> : null}
-
-      {targetUser ? (
+      {loading ? (
         <article className="panel single-user-card">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div className="single-user-row" key={index}>
+              <span className="skeleton skeleton-line small" />
+              <span className="skeleton skeleton-line" />
+            </div>
+          ))}
+        </article>
+      ) : null}
+
+      {!loading && targetUser ? (
+        <article className="panel single-user-card single-user-summary-card">
           <div className="single-user-row">
             <p className="label">Name</p>
             <p className="value">{targetUser.name}</p>
@@ -156,7 +170,7 @@ export function AdminUserDetailPage() {
           <div className="single-user-row">
             <p className="label">Role</p>
             <p className="value">
-              <span className={`chip role-${targetUser.role.toLowerCase()}`}>{targetUser.role}</span>
+              <span className={`chip role-${targetUser.role.toLowerCase()}`}>{formatRoleLabel(targetUser.role)}</span>
             </p>
           </div>
           <div className="single-user-row">
@@ -177,8 +191,8 @@ export function AdminUserDetailPage() {
         </article>
       ) : null}
 
-      <div className="panel filter-panel top-gap">
-        <h3>Videos</h3>
+      <div className="panel filter-panel top-gap single-user-video-controls">
+        <h3>User Videos</h3>
         <div className="filters-grid">
           <div className="select-shell">
             <select
@@ -216,21 +230,37 @@ export function AdminUserDetailPage() {
         </div>
       </div>
 
-      <div className="video-grid">
-        {videos.map((video) => (
-          <article className="panel video-card" key={video._id}>
-            <h3>{video.title || "Untitled"}</h3>
-            <div className="chip-row">
-              <span className={`chip status-${video.status.toLowerCase()}`}>Status: {video.status}</span>
-              <span className={`chip sensitivity-${(video.sensitivity ?? "PENDING").toLowerCase()}`}>
-                {video.sensitivity || "PENDING"}
-              </span>
-            </div>
-            <p className="muted">Uploaded: {formatDate(video.createdAt)}</p>
-            <video controls preload="metadata" src={token ? getStreamUrl(video._id, token) : ""} />
-          </article>
-        ))}
-      </div>
+      {loading ? (
+        <div className="video-grid">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <article className="panel video-card video-skeleton-card" key={index}>
+              <span className="skeleton skeleton-line" />
+              <div className="chip-row">
+                <span className="skeleton skeleton-chip" />
+                <span className="skeleton skeleton-chip" />
+              </div>
+              <span className="skeleton skeleton-line small" />
+              <div className="skeleton skeleton-media" />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="video-grid">
+          {videos.map((video) => (
+            <article className="panel video-card" key={video._id}>
+              <h3>{video.title || "Untitled"}</h3>
+              <div className="chip-row">
+                <span className={`chip status-${video.status.toLowerCase()}`}>Status: {video.status}</span>
+                <span className={`chip sensitivity-${(video.sensitivity ?? "PENDING").toLowerCase()}`}>
+                  {video.sensitivity || "PENDING"}
+                </span>
+              </div>
+              <p className="muted">Uploaded: {formatDate(video.createdAt)}</p>
+              <video controls preload="metadata" src={token ? getStreamUrl(video._id, token) : ""} />
+            </article>
+          ))}
+        </div>
+      )}
 
       {!loading && videos.length === 0 ? <p className="alert alert-info">No videos found for this user.</p> : null}
 

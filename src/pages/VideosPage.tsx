@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpDown, ListFilter, Search, ShieldAlert } from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { getStreamUrl, getVideos } from "../services/api";
 import { connectVideoSocket } from "../services/socket";
 import type { VideoFilters, VideoItem, VideoProgressEvent } from "../types";
+import { getErrorMessage } from "../utils/error";
+
+type VideoMenuKey = "status" | "sensitivity" | "sort" | "";
 
 export function VideosPage() {
   const { token } = useAuth();
+  const { showToast } = useToast();
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [liveProgress, setLiveProgress] = useState<Record<string, number>>({});
   const [filters, setFilters] = useState<VideoFilters>({
@@ -15,8 +21,21 @@ export function VideosPage() {
     search: "",
     sort: "desc",
   });
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeMenu, setActiveMenu] = useState<VideoMenuKey>("");
+  const filterRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!filterRef.current) return;
+      if (!filterRef.current.contains(event.target as Node)) {
+        setActiveMenu("");
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
 
   useEffect(() => {
     async function loadVideos() {
@@ -29,14 +48,15 @@ export function VideosPage() {
         const response = await getVideos(token, filters);
         setVideos(response.videos);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not fetch videos");
+        const message = getErrorMessage(err, "Could not fetch videos.");
+        showToast(message, "error");
       } finally {
         setLoading(false);
       }
     }
 
     void loadVideos();
-  }, [token, filters]);
+  }, [token, filters, showToast]);
 
   useEffect(() => {
     if (!token) {
@@ -85,90 +105,163 @@ export function VideosPage() {
     <section>
       <div className="page-head">
         <h2>My Videos</h2>
-        <p>Latest uploads and moderation status from backend records.</p>
+        <p>Track upload status, review outcome, and playback.</p>
       </div>
 
-      <div className="panel filter-panel">
-        <h3>Filter Library</h3>
+      <div className="panel filter-panel" ref={filterRef}>
+        <h3>Video Filters</h3>
         <div className="filters-grid">
-          <input
-            placeholder="Search by title"
-            value={filters.search ?? ""}
-            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
-          />
-          <div className="select-shell">
-            <select
-              value={filters.status ?? ""}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  status: event.target.value as VideoFilters["status"],
-                }))
-              }
-            >
-              <option value="">All statuses</option>
-              <option value="UPLOADING">Uploading</option>
-              <option value="PROCESSING">Processing</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
-            <span className="select-caret" />
+          <div className="input-shell">
+            <Search size={16} />
+            <input
+              placeholder="Search by title"
+              value={filters.search ?? ""}
+              onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+            />
           </div>
-          <div className="select-shell">
-            <select
-              value={filters.sensitivity ?? ""}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  sensitivity: event.target.value as VideoFilters["sensitivity"],
-                }))
-              }
+
+          <div className="dropdown-wrap">
+            <button
+              type="button"
+              className="filter-trigger"
+              onClick={() => setActiveMenu((current) => (current === "status" ? "" : "status"))}
             >
-              <option value="">All sensitivity</option>
-              <option value="SAFE">Safe</option>
-              <option value="FLAGGED">Flagged</option>
-            </select>
-            <span className="select-caret" />
+              <ListFilter size={14} />
+              {filters.status ? filters.status : "All statuses"}
+              <span className="select-caret" />
+            </button>
+            {activeMenu === "status" ? (
+              <div className="filter-menu">
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, status: "" }));
+                  setActiveMenu("");
+                }}>
+                  All statuses
+                </button>
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, status: "UPLOADING" }));
+                  setActiveMenu("");
+                }}>
+                  Uploading
+                </button>
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, status: "PROCESSING" }));
+                  setActiveMenu("");
+                }}>
+                  Processing
+                </button>
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, status: "COMPLETED" }));
+                  setActiveMenu("");
+                }}>
+                  Completed
+                </button>
+              </div>
+            ) : null}
           </div>
-          <div className="select-shell">
-            <select
-              value={filters.sort ?? "desc"}
-              onChange={(event) =>
-                setFilters((current) => ({ ...current, sort: event.target.value as "asc" | "desc" }))
-              }
+
+          <div className="dropdown-wrap">
+            <button
+              type="button"
+              className="filter-trigger"
+              onClick={() => setActiveMenu((current) => (current === "sensitivity" ? "" : "sensitivity"))}
             >
-              <option value="desc">Newest first</option>
-              <option value="asc">Oldest first</option>
-            </select>
-            <span className="select-caret" />
+              <ShieldAlert size={14} />
+              {filters.sensitivity ? filters.sensitivity : "All sensitivity"}
+              <span className="select-caret" />
+            </button>
+            {activeMenu === "sensitivity" ? (
+              <div className="filter-menu">
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, sensitivity: "" }));
+                  setActiveMenu("");
+                }}>
+                  All sensitivity
+                </button>
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, sensitivity: "SAFE" }));
+                  setActiveMenu("");
+                }}>
+                  Safe
+                </button>
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, sensitivity: "FLAGGED" }));
+                  setActiveMenu("");
+                }}>
+                  Flagged
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="dropdown-wrap">
+            <button
+              type="button"
+              className="filter-trigger"
+              onClick={() => setActiveMenu((current) => (current === "sort" ? "" : "sort"))}
+            >
+              <ArrowUpDown size={14} />
+              {filters.sort === "asc" ? "Oldest first" : "Newest first"}
+              <span className="select-caret" />
+            </button>
+            {activeMenu === "sort" ? (
+              <div className="filter-menu">
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, sort: "desc" }));
+                  setActiveMenu("");
+                }}>
+                  Newest first
+                </button>
+                <button type="button" className="filter-item" onClick={() => {
+                  setFilters((current) => ({ ...current, sort: "asc" }));
+                  setActiveMenu("");
+                }}>
+                  Oldest first
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
         <p className="muted">Processing now: {processingCount}</p>
       </div>
 
-      {loading ? <p className="alert alert-info">Loading videos...</p> : null}
-      {error ? <p className="alert alert-error">{error}</p> : null}
-
-      <div className="video-grid">
-        {videos.map((video) => (
-          <article className="panel video-card" key={video._id}>
-            <h3>{video.title || "Untitled"}</h3>
-            <div className="chip-row">
-              <span className={`chip status-${video.status.toLowerCase()}`}>Status: {video.status}</span>
-              <span className={`chip sensitivity-${(video.sensitivity ?? "PENDING").toLowerCase()}`}>
-                Sensitivity: {video.sensitivity || "PENDING"}
-              </span>
-            </div>
-            <div className="progress-track">
-              <div
-                className="progress-fill"
-                style={{ width: `${liveProgress[video._id] ?? (video.status === "COMPLETED" ? 100 : 0)}%` }}
-              />
-            </div>
-            <p className="muted">Progress: {liveProgress[video._id] ?? (video.status === "COMPLETED" ? 100 : 0)}%</p>
-            <video controls preload="metadata" src={token ? getStreamUrl(video._id, token) : ""} />
-          </article>
-        ))}
-      </div>
+      {loading ? (
+        <div className="video-grid">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <article className="panel video-card video-skeleton-card" key={index}>
+              <span className="skeleton skeleton-line" />
+              <div className="chip-row">
+                <span className="skeleton skeleton-chip" />
+                <span className="skeleton skeleton-chip" />
+              </div>
+              <span className="skeleton skeleton-line small" />
+              <div className="skeleton skeleton-media" />
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="video-grid">
+          {videos.map((video) => (
+            <article className="panel video-card" key={video._id}>
+              <h3>{video.title || "Untitled"}</h3>
+              <div className="chip-row">
+                <span className={`chip status-${video.status.toLowerCase()}`}>Status: {video.status}</span>
+                <span className={`chip sensitivity-${(video.sensitivity ?? "PENDING").toLowerCase()}`}>
+                  Review: {video.sensitivity || "PENDING"}
+                </span>
+              </div>
+              <div className="progress-track">
+                <div
+                  className="progress-fill"
+                  style={{ width: `${liveProgress[video._id] ?? (video.status === "COMPLETED" ? 100 : 0)}%` }}
+                />
+              </div>
+              <p className="muted">Progress: {liveProgress[video._id] ?? (video.status === "COMPLETED" ? 100 : 0)}%</p>
+              <video controls preload="metadata" src={token ? getStreamUrl(video._id, token) : ""} />
+            </article>
+          ))}
+        </div>
+      )}
 
       {!loading && videos.length === 0 ? <p className="alert alert-info">No videos uploaded yet.</p> : null}
     </section>

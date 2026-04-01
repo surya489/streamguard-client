@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 
 import { loginRequest, registerRequest } from "../services/api";
@@ -43,6 +44,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateUser = (patch: Partial<UserInfo>) => {
+    setUser((current) => (current ? { ...current, ...patch } : current));
+  };
+
   const value = useMemo(
     () => ({
       token,
@@ -50,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      updateUser,
     }),
     [token, user]
   );
