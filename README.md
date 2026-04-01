@@ -54,10 +54,18 @@ It covers authentication, upload, realtime processing updates, video listing, ad
 - `src/config` environment configuration
 
 ## 6. Environment Variables
-Create `.env` in frontend root:
+Use this exact format in `.env` files.
 
+Frontend (`streamguard-client/.env`):
 ```env
-API_BASE_URL=http://localhost:5000
+API_BASE_URL=API_BASE_URL
+```
+
+Frontend value examples:
+```env
+API_BASE_URL=YOUR_LOCAL_BACKEND_URL
+# or
+API_BASE_URL=YOUR_DEPLOYED_LINK
 ```
 
 ## 7. Setup and Run
