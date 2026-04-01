@@ -154,7 +154,17 @@ npm run preview
 - Backend storage is currently local `uploads/` path.
 - AWS-related backend code is kept for future switch-back, but not active now.
 
-## 14. Troubleshooting
+## 14. Testing
+- Frontend automated test files are not added yet in this submission.
+- I validated this frontend using:
+  - type-safe build (`npm run build`)
+  - route-level/manual flow checks (auth, upload, videos, admin, profile)
+- This helps me verify:
+  - no TypeScript build break
+  - no production bundling errors
+  - end-to-end UI flow behavior against backend APIs
+
+## 15. Troubleshooting
 - If API fails, I verify `API_BASE_URL` in `.env`.
 - If upload fails, I verify backend is running and upload route is reachable.
 - If socket updates do not appear, I verify backend socket server and token auth.
